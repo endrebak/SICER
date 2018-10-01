@@ -1,4 +1,11 @@
-using DataFrames, CSV, MultipleTesting
+using DataFrames, CSV, MultipleTesting, Statistics
+
+# genome = "hG19"
+# datapath = joinpath(@__DIR__, "genomes/")
+# chromsizes = joinpath(datapath, "chromsizes", lowercase(genome) * ".chromsizes")
+
+# df = CSV.read(chromsizes, delim="\t")
+
 
 println("Done compiling!")
 
@@ -38,6 +45,46 @@ chromsizes = Dict("chr1" => 249250621,
                   "chr21" => 48129895,
                   "chrM" => 16571)
 
+# function par_by(df::AbstractDataFrame, col::Symbol,f::Function,block_size=40)
+#     #f needs to be precompiled - we precompile using the first row of the DataFrame.
+#     #If try to do it within @thread macro
+#     #Julia will crash in most ugly and unexpected ways
+#     #if you comment out this line you can observe a different crash with every run
+#     by(view(df,1:1),col,f);
+
+#     nr = nrow(df)
+#     local dfs = DataFrame()
+#     blocks = Int(ceil(nr/block_size))
+#     s = Threads.SpinLock()
+#     Threads.@threads for block in 1:blocks
+#         startix = (block-1)*block_size+1
+#         endix = min(block*block_size,nr)
+#         rv= by(view(df,startix:endix), col, f)
+#         Threads.lock(s)
+#         if nrow(dfs) == 0
+#             dfs = rv
+#         else
+#             append!(dfs,rv)
+#         end
+#         Threads.unlock(s)
+#     end
+#     dfs
+# end
+
+# function par_by2(df::AbstractDataFrame, col::Symbol,f::Function)
+#     res = NamedTuple[]
+#     s = Threads.SpinLock()
+#     groups = groupby(df,col)
+#     f(view(groups[1],1:1));
+#     Threads.@threads for g in 1:length(groups)
+#         rv= f(groups[g])
+#         Threads.lock(s)
+#         push!(res,(key=groups[g][col][1],val=rv))
+#         Threads.unlock(s)
+#     end
+#     res
+# end
+
 function bin_positions(bdf, half_fragment_size)
 
     chromosome = bdf[1, :Chromosome]
@@ -69,7 +116,8 @@ function df_to_bins(f, args)
     half_fragment_size::Int64 = args["fragment_size"] / 2
     # println("half_fragment_size", half_fragment_size)
 
-    df = CSV.read(f, delim="\t", header=["Chromosome", "Start", "End", "Name", "Score", "Strand"], categorical=true)
+    df = file_to_df(f)
+    # df = CSV.read(f, delim="\t", header=["Chromosome", "Start", "End", "Name", "Score", "Strand"], categorical=true)
 
     # println("head(df)", head(df))
 
@@ -322,6 +370,50 @@ function sicer_wout_input(args)
   CSV.write(args["outfile"], result, delim='\t')
 
 end
+
+
+function bam_to_df(f, nrows)
+
+    df = DataFrame(Chromosome = String[], Start = Int64[], End = Int64[], Name = Int64[], Score = Int64[], Strand = String[])
+
+    # include max number of rows to read - how?
+    counter = 0
+
+    for alignment in open(BAM.Reader, "../epic/examples/test.bam")
+        if BAM.ismapped(alignment)
+            lpos = BAM.position(alignment) - 1
+            rpos = lpos + BAM.alignlength(alignment)
+
+            if BAM.flag(alignment) & 0 == 0
+                strand = "+"
+            else
+                strand = "-"
+            end
+
+            push!(df, [BAM.refname(alignment), lpos, rpos, 0, 0, strand])
+        end
+    end
+
+    df[1] = CategoricalArray(df[1])
+    df[6] = CategoricalArray(df[6])
+
+    df
+
+end
+
+
+function file_to_df(f, nrows=nothing)
+    if endswith(f, ".bam")
+        bam_to_df(f, nrows)
+    else
+        CSV.read(f, delim="\t", limit=nrows)
+    end
+end
+
+
+
+
+
 
 function main()
 
