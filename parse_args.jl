@@ -43,9 +43,7 @@ end
 function chromosome_sizes(genome)
     # datapath = joinpath(@__DIR__, "genomes/")
     datapath = joinpath(@__DIR__, "genomes/")
-    # println(datapath)
     f = joinpath(datapath, "chromsizes", lowercase(genome) * ".chromsizes")
-    # println(f)
     CSV.read(f, delim="\t", header=false)
 end
 
@@ -119,9 +117,7 @@ function parse_commandline()
 
     if args["genome"] != nothing
         genome = lowercase(args["genome"])
-        println("find egf")
         args["effective_genome_fraction"] = find_egf(args["chip"][1], genome)
-        println("find chromsizes")
         args["chromosome_sizes"] = chromosome_sizes(genome)
         args["effective_genome_size"] = sum(args["chromosome_sizes"][2]) * args["effective_genome_fraction"]
     else
@@ -137,11 +133,9 @@ function main()
 
     parsed_args = parse_commandline()
 
-    for (arg, val) in parsed_args
-        if val != nothing
-            println("  $arg => $val")
-        else
-            println("  Missing: $arg")
-        end
-    end
+    # for (arg, val) in parsed_args
+    #     if val != nothing
+    #     else
+    #     end
+    # end
 end

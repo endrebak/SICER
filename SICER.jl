@@ -12,7 +12,6 @@ include("statistics.jl")
 function bin_positions(bdf, half_fragment_size, chromsizes)
 
     chromosome = bdf[1, :Chromosome]
-    println("  ", chromosome)
 
     sort!(bdf[:, [2,3]], [:Start, :End])
 
@@ -39,9 +38,7 @@ function df_to_bins(f, args)
 
     half_fragment_size::Int64 = args["fragment_size"] / 2
 
-    println("file to df")
     df = file_to_df(f)
-    println("done reading")
 
 
     #= remove columns not needed; should not be read in first place
@@ -152,36 +149,25 @@ end
 
 function sicer_w_input(args)
 
-  println("chip to bins")
   chip_df = vcat(map(x -> df_to_bins(x, args), args["chip"])...)
 
-  println("ChIP by")
   chip_df = by(chip_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
 
 
-  println("input to bins")
   input_df = vcat(map(x -> df_to_bins(x, args), args["input"])...)
-  println("Input by")
   input_df = by(input_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
 
   total_chip_count = sum(chip_df.Count)
   total_input_count = sum(input_df.Count)
 
 
-  println("Score threshold")
-  println(total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
   score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
       total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
 
-  println("give bins p")
   chip_df = give_bins_pvalues(chip_df, island_enriched_threshold, average_window_readcount)
 
 
-  println("join chip input")
-  println("chip_df", head(chip_df))
-  println("input_df", head(input_df))
   df = join(chip_df, input_df, on=[:Chromosome, :Bin], kind=:left)
-  println("df", head(df))
   rename!(df, [:Count_1 => :InputCount])
   missing_input = ismissing.(df[:InputCount])
   df[missing_input, :InputCount] = 0
@@ -191,13 +177,10 @@ function sicer_w_input(args)
   df[:End] = df[:Start] .+ args["bin_size"] .- 1
   df[:Score] = -log.(df[:Score])
 
-  println("find islands")
-  println(head(df))
   result = by(df, [:Chromosome], x -> merge_nearby_bins(x, args["gaps_allowed"], args["bin_size"], score_threshold))
 
   result = result[[:Chromosome, :Start, :End, :Count, :InputCount, :Score]]
 
-  println("fdr score")
   fdr_df = give_islands_fdr_score(result, total_chip_count, total_input_count, args["effective_genome_fraction"])
 
   CSV.write(args["outfile"], fdr_df, delim='\t')
@@ -268,7 +251,6 @@ function file_to_df(f, nrows=nothing)
     if endswith(f, ".bam")
         bam_to_df(f, nrows)
     else
-        println("CSV read")
         df = CSV.read(f, delim="\t", header=["Chromosome", "Start", "End", "Name", "Score", "Strand"], limit=nrows)
         df[1] = CategoricalArray(df[1])
         df[6] = CategoricalArray(df[6])
@@ -284,11 +266,9 @@ end
 Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
 
     args = parse_commandline()
-    println(args["chromosome_sizes"][1])
     df = args["chromosome_sizes"]
     args["chromosome_sizes"] = Dict(zip(df[1], df[2]))
 
-    println("outfile ", args["outfile"])
     if !isempty(args["input"])
         sicer_w_input(args)
     else
