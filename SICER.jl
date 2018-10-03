@@ -291,6 +291,7 @@ Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
     df = args["chromosome_sizes"]
     args["chromosome_sizes"] = Dict(zip(df[1], df[2]))
 
+    println("outfile ", args["outfile"])
     if !isempty(args["input"])
         sicer_w_input(args)
     else
