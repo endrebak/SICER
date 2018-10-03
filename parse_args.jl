@@ -42,7 +42,7 @@ end
 
 function chromosome_sizes(genome)
     # datapath = joinpath(@__DIR__, "genomes/")
-    datapath = "genomes"
+    datapath = joinpath(@__DIR__, "genomes/")
     # println(datapath)
     f = joinpath(datapath, "chromsizes", lowercase(genome) * ".chromsizes")
     # println(f)
