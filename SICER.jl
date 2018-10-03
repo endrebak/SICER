@@ -8,36 +8,35 @@ include("parse_args.jl")
 include("statistics.jl")
 
 
-natural = NaturalSort.natural
 
-chromsizes = Dict("chr1" => 249250621,
-                  "chr2" => 243199373,
-                  "chr3" => 198022430,
-                  "chr4" => 191154276,
-                  "chr5" => 180915260,
-                  "chr6" => 171115067,
-                  "chr7" => 159138663,
-                  "chrX" => 155270560,
-                  "chr8" => 146364022,
-                  "chr9" => 141213431,
-                  "chr10" => 135534747,
-                  "chr11" => 135006516,
-                  "chr12" => 133851895,
-                  "chr13" => 115169878,
-                  "chr14" => 107349540,
-                  "chr15" => 102531392,
-                  "chr16" => 90354753,
-                  "chr17" => 81195210,
-                  "chr18" => 78077248,
-                  "chr20" => 63025520,
-                  "chrY" => 59373566,
-                  "chr19" => 59128983,
-                  "chr22" => 51304566,
-                  "chr21" => 48129895,
-                  "chrM" => 16571)
+# chromsizes = Dict("chr1" => 249250621,
+#                   "chr2" => 243199373,
+#                   "chr3" => 198022430,
+#                   "chr4" => 191154276,
+#                   "chr5" => 180915260,
+#                   "chr6" => 171115067,
+#                   "chr7" => 159138663,
+#                   "chrX" => 155270560,
+#                   "chr8" => 146364022,
+#                   "chr9" => 141213431,
+#                   "chr10" => 135534747,
+#                   "chr11" => 135006516,
+#                   "chr12" => 133851895,
+#                   "chr13" => 115169878,
+#                   "chr14" => 107349540,
+#                   "chr15" => 102531392,
+#                   "chr16" => 90354753,
+#                   "chr17" => 81195210,
+#                   "chr18" => 78077248,
+#                   "chr20" => 63025520,
+#                   "chrY" => 59373566,
+#                   "chr19" => 59128983,
+#                   "chr22" => 51304566,
+#                   "chr21" => 48129895,
+#                   "chrM" => 16571)
 
 
-function bin_positions(bdf, half_fragment_size)
+function bin_positions(bdf, half_fragment_size, chromsizes)
 
     chromosome = bdf[1, :Chromosome]
 
@@ -73,16 +72,18 @@ function df_to_bins(f, args)
      see github issue: TODO: add =#
     df = df[[1, 2, 3, 6]]
 
+    df = df[in.(df[:Chromosome], (keys(args["chromosome_sizes"]),)), :]
+
     if remove_duplicates
         df = unique(df)
     end
 
     # turn positions chrX 1687 1700 + into chrX 1600 instead
-    df = by(df, [:Chromosome, :Strand], x -> bin_positions(x, half_fragment_size))
+    df = by(df, [:Chromosome, :Strand], x -> bin_positions(x, half_fragment_size, args["chromosome_sizes"]))
     # remove strand
     df = df[[1, 3]]
 
-    lvl = sort(unique(df[1]), lt=natural)
+    lvl = sort(unique(df[1]), lt=NaturalSort.natural)
     levels!(df[1], lvl)
 
     return df
@@ -283,9 +284,12 @@ end
 
 
 
-function main()
+Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
 
     args = parse_commandline()
+    println(args["chromosome_sizes"][1])
+    df = args["chromosome_sizes"]
+    args["chromosome_sizes"] = Dict(zip(df[1], df[2]))
 
     if !isempty(args["input"])
         sicer_w_input(args)
@@ -293,6 +297,8 @@ function main()
         sicer_wout_input(args)
     end
 
+    return 0
+
 end
 
-main()
+julia_main([""])
