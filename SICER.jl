@@ -9,36 +9,10 @@ include("statistics.jl")
 
 
 
-# chromsizes = Dict("chr1" => 249250621,
-#                   "chr2" => 243199373,
-#                   "chr3" => 198022430,
-#                   "chr4" => 191154276,
-#                   "chr5" => 180915260,
-#                   "chr6" => 171115067,
-#                   "chr7" => 159138663,
-#                   "chrX" => 155270560,
-#                   "chr8" => 146364022,
-#                   "chr9" => 141213431,
-#                   "chr10" => 135534747,
-#                   "chr11" => 135006516,
-#                   "chr12" => 133851895,
-#                   "chr13" => 115169878,
-#                   "chr14" => 107349540,
-#                   "chr15" => 102531392,
-#                   "chr16" => 90354753,
-#                   "chr17" => 81195210,
-#                   "chr18" => 78077248,
-#                   "chr20" => 63025520,
-#                   "chrY" => 59373566,
-#                   "chr19" => 59128983,
-#                   "chr22" => 51304566,
-#                   "chr21" => 48129895,
-#                   "chrM" => 16571)
-
-
 function bin_positions(bdf, half_fragment_size, chromsizes)
 
     chromosome = bdf[1, :Chromosome]
+    println("  ", chromosome)
 
     sort!(bdf[:, [2,3]], [:Start, :End])
 
@@ -65,12 +39,13 @@ function df_to_bins(f, args)
 
     half_fragment_size::Int64 = args["fragment_size"] / 2
 
+    println("file to df")
     df = file_to_df(f)
+    println("done reading")
 
 
     #= remove columns not needed; should not be read in first place
      see github issue: TODO: add =#
-    df = df[[1, 2, 3, 6]]
 
     df = df[in.(df[:Chromosome], (keys(args["chromosome_sizes"]),)), :]
 
@@ -176,22 +151,37 @@ function merge_nearby_bins_no_input(df, gaps_allowed, bin_size, score_threshold)
 end
 
 function sicer_w_input(args)
+
+  println("chip to bins")
   chip_df = vcat(map(x -> df_to_bins(x, args), args["chip"])...)
+
+  println("ChIP by")
   chip_df = by(chip_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
 
 
+  println("input to bins")
   input_df = vcat(map(x -> df_to_bins(x, args), args["input"])...)
+  println("Input by")
   input_df = by(input_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
 
   total_chip_count = sum(chip_df.Count)
   total_input_count = sum(input_df.Count)
 
-  score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
-      total_chip_count, args["bin_size"], args["effective_genome_fraction"], args["gaps_allowed"])
 
+  println("Score threshold")
+  println(total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
+  score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
+      total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
+
+  println("give bins p")
   chip_df = give_bins_pvalues(chip_df, island_enriched_threshold, average_window_readcount)
 
+
+  println("join chip input")
+  println("chip_df", head(chip_df))
+  println("input_df", head(input_df))
   df = join(chip_df, input_df, on=[:Chromosome, :Bin], kind=:left)
+  println("df", head(df))
   rename!(df, [:Count_1 => :InputCount])
   missing_input = ismissing.(df[:InputCount])
   df[missing_input, :InputCount] = 0
@@ -201,10 +191,13 @@ function sicer_w_input(args)
   df[:End] = df[:Start] .+ args["bin_size"] .- 1
   df[:Score] = -log.(df[:Score])
 
+  println("find islands")
+  println(head(df))
   result = by(df, [:Chromosome], x -> merge_nearby_bins(x, args["gaps_allowed"], args["bin_size"], score_threshold))
 
   result = result[[:Chromosome, :Start, :End, :Count, :InputCount, :Score]]
 
+  println("fdr score")
   fdr_df = give_islands_fdr_score(result, total_chip_count, total_input_count, args["effective_genome_fraction"])
 
   CSV.write(args["outfile"], fdr_df, delim='\t')
@@ -220,7 +213,7 @@ function sicer_wout_input(args)
   total_chip_count = sum(chip_df.Count)
 
   score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
-      total_chip_count, args["bin_size"], args["effective_genome_fraction"], args["gaps_allowed"])
+      total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
 
   df = give_bins_pvalues(chip_df, island_enriched_threshold, average_window_readcount)
 
@@ -243,7 +236,7 @@ end
 
 function bam_to_df(f, nrows)
 
-    df = DataFrame(Chromosome = String[], Start = Int64[], End = Int64[], Name = Int64[], Score = Int64[], Strand = String[])
+    df = DataFrame(Chromosome = String[], Start = Int64[], End = Int64[], Strand = String[])
 
     # include max number of rows to read - how?
     counter = 0
@@ -259,7 +252,7 @@ function bam_to_df(f, nrows)
                 strand = "-"
             end
 
-            push!(df, [BAM.refname(alignment), lpos, rpos, 0, 0, strand])
+            push!(df, [BAM.refname(alignment), lpos, rpos, strand])
         end
     end
 
@@ -275,7 +268,11 @@ function file_to_df(f, nrows=nothing)
     if endswith(f, ".bam")
         bam_to_df(f, nrows)
     else
-        CSV.read(f, delim="\t", header=["Chromosome", "Start", "End", "Name", "Score", "Strand"], categorical=true, limit=nrows)
+        println("CSV read")
+        df = CSV.read(f, delim="\t", header=["Chromosome", "Start", "End", "Name", "Score", "Strand"], limit=nrows)
+        df[1] = CategoricalArray(df[1])
+        df[6] = CategoricalArray(df[6])
+        df[[1, 2, 3, 6]]
     end
 end
 

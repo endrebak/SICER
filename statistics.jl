@@ -173,12 +173,14 @@ end
 function compute_enriched_threshold(poisson)
 
     current_threshold, survival_function = 0, 1
-    while true
-        survival_function -= pdf(poisson, current_threshold)
-        if survival_function <= WINDOW_P_VALUE
-            break
-        end
+
+    println("poisson.λ ", poisson.λ)
+    survival_function -= pdf(poisson, current_threshold)
+    println("survival_function ", survival_function)
+    println("p ", WINDOW_P_VALUE)
+    while survival_function > WINDOW_P_VALUE
         current_threshold += 1
+        survival_function -= pdf(poisson, current_threshold)
     end
 
     island_enriched_threshold = current_threshold + 1
@@ -248,18 +250,25 @@ function compute_background_probabilities(total_chip_count, bin_size, effective_
 
     poisson = Poisson(average_window_readcount)
 
+    println("compute island enriched threshold")
     island_enriched_threshold = compute_enriched_threshold(poisson)
+    println("island_enriched_threshold ", island_enriched_threshold)
 
+    println("compute gap factor")
     gap_contribution = compute_gap_factor(island_enriched_threshold, gap_intervals_allowed, poisson)
+    println("gap_contribution", gap_contribution)
 
+    println("compute boundary")
     boundary_contribution = compute_boundary(island_enriched_threshold, gap_intervals_allowed, poisson)
+    println("boundary_contribution", boundary_contribution)
 
     genome_length_in_bins = effective_genome_fraction / bin_size
 
-    score_threshold = compute_score_threshold(average_window_readcount,
-                                              island_enriched_threshold,
-                                              gap_contribution, boundary_contribution,
-                                              genome_length_in_bins, bin_size)
+    println("compute score threshold")
+    println("average_window_readcount, island_enriched_threshold, gap_contribution, boundary_contribution, genome_length_in_bins, bin_size")
+    println(join([average_window_readcount, island_enriched_threshold, gap_contribution, boundary_contribution, genome_length_in_bins, bin_size], " "))
+    score_threshold = compute_score_threshold(average_window_readcount, island_enriched_threshold,
+                                              gap_contribution, boundary_contribution, genome_length_in_bins, bin_size)
 
     # println("island_enriched_threshold ", island_enriched_threshold)
     # println("gap_contribution ", gap_contribution)
@@ -275,7 +284,10 @@ end
 
 function give_bins_pvalues(df, island_enriched_threshold, average_window_readcount)
 
+    println("df give bins p", head(df))
+    println("island_enriched_threshold", island_enriched_threshold)
     df = df[df[:Count] .>= island_enriched_threshold, :]
+    println("df give bins p", head(df))
 
     println("poisson value give bins p-values ", average_window_readcount)
     poisson = Poisson(average_window_readcount)

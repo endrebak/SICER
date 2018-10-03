@@ -119,7 +119,9 @@ function parse_commandline()
 
     if args["genome"] != nothing
         genome = lowercase(args["genome"])
+        println("find egf")
         args["effective_genome_fraction"] = find_egf(args["chip"][1], genome)
+        println("find chromsizes")
         args["chromosome_sizes"] = chromosome_sizes(genome)
         args["effective_genome_size"] = sum(args["chromosome_sizes"][2]) * args["effective_genome_fraction"]
     else
