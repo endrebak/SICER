@@ -1,0 +1,4 @@
+const WINDOW_P_VALUE = 0.20
+const BIN_SIZE = 0.001
+const E_VALUE = 1000
+const E_VALUE_THRESHOLD = E_VALUE * .0000001
