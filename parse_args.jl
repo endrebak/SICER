@@ -127,15 +127,3 @@ function parse_commandline()
 
     args
 end
-
-
-function main()
-
-    parsed_args = parse_commandline()
-
-    # for (arg, val) in parsed_args
-    #     if val != nothing
-    #     else
-    #     end
-    # end
-end

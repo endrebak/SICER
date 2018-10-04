@@ -40,7 +40,6 @@ function df_to_bins(f, args)
 
     df = file_to_df(f)
 
-
     #= remove columns not needed; should not be read in first place
      see github issue: TODO: add =#
 
@@ -148,6 +147,8 @@ function merge_nearby_bins_no_input(df, gaps_allowed, bin_size, score_threshold)
 end
 
 function sicer_w_input(args)
+
+  println(args)
 
   chip_df = vcat(map(x -> df_to_bins(x, args), args["chip"])...)
 
@@ -279,4 +280,4 @@ Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
 
 end
 
-julia_main([""])
+# julia_main([""])
