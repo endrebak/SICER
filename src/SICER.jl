@@ -1,11 +1,11 @@
+module SICER
+
 using DataFrames, CSV, MultipleTesting, Statistics
 
 
 include("natsort.jl")
 include("statistics.jl")
 include("parse_args.jl")
-
-include("statistics.jl")
 
 
 
@@ -302,3 +302,5 @@ Base.@ccallable function julia_main(ARGS::Vector{String})::Cint
 end
 
 # julia_main([""])
+
+end

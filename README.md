@@ -1,4 +1,3 @@
-# epic.jl
+# SICER.jl
 
-bugfix: library size used in computing FDR contains out of bounds reads
-
+SICER written in Julia. Under rapid development.

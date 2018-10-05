@@ -28,7 +28,7 @@ end
 
 
 function read_egf(genome, closest_readlength)
-    datapath = joinpath(@__DIR__, "genomes/")
+    datapath = joinpath(@__DIR__, "..", "genomes")
     f = joinpath(datapath, "effective_genome_sizes", lowercase(genome) * string("_") * string(closest_readlength) * ".txt")
     df = CSV.read(f, delim="\t", header=false)
     parse(Float64, split(df[4, 1], ":  ")[2])
@@ -41,8 +41,7 @@ function find_egf(file, genome)
 end
 
 function chromosome_sizes(genome)
-    # datapath = joinpath(@__DIR__, "genomes/")
-    datapath = joinpath(@__DIR__, "genomes/")
+    datapath = joinpath(@__DIR__, "..", "genomes")
     f = joinpath(datapath, "chromsizes", lowercase(genome) * ".chromsizes")
     CSV.read(f, delim="\t", header=false)
 end
