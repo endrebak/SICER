@@ -146,45 +146,89 @@ function merge_nearby_bins_no_input(df, gaps_allowed, bin_size, score_threshold)
 
 end
 
+function files_to_bins(files, args)
+
+    bins = Dict{String, Array{Int64, 1}}()
+    total = Dict{String, Array{Int64, 1}}()
+
+    bin_size = args["bin_size"]
+    half_fragment_size = args["fragment_size"] / 2
+    for file in files
+
+        # store 5' end
+        tags = add_reads_to_dict(file)
+
+        # remove duplicates
+        println("remove dups")
+        if !convert(Bool, args["keep_duplicates"])
+            for (k, v) in tags
+
+
+                sort!(v)
+                unique!(v)
+            end
+        end
+
+        println("shift reads")
+        # shift reads
+        for ((chromosome, strand), v) in tags
+            if strand == "+"
+                println(strand)
+                tags[chromosome, strand] = [e + half_fragment_size for e in v]
+            else
+                println(strand)
+                tags[chromosome, strand] = [e - half_fragment_size for e in v]
+            end
+        end
+
+        # bin reads
+        println("bin reads")
+        for ((chromosome, strand), v) in tags
+            append!(get!(bins, (chromosome), Int64[]), [e - rem(e, bin_size) for e in v])
+        end
+
+    end
+
+    for (k, v) in bins
+        sort!(v)
+        total[k] = [sum(v .== i) for i in unique(v)]
+        unique!(v)
+    end
+
+    bins, total
+end
+
 function sicer_w_input(args)
 
-  println(args)
+    chip_bins, chip_counts = files_to_bins(args["chip"], args)
+    input_bins, input_counts = files_to_bins(args["input"], args)
 
-  chip_df = vcat(map(x -> df_to_bins(x, args), args["chip"])...)
+    total_chip_count = sum(v for v in values(chip_counts))
+    total_input_count = sum(v for v in values(input_counts))
 
-  chip_df = by(chip_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
+    score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
+        total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
 
-
-  input_df = vcat(map(x -> df_to_bins(x, args), args["input"])...)
-  input_df = by(input_df, [:Chromosome, :Bin], x -> DataFrame(Count=nrow(x)), sort=true)
-
-  total_chip_count = sum(chip_df.Count)
-  total_input_count = sum(input_df.Count)
+    chip_df = give_bins_pvalues(chip_df, island_enriched_threshold, average_window_readcount)
 
 
-  score_threshold, island_enriched_threshold, average_window_readcount = compute_background_probabilities(
-      total_chip_count, args["bin_size"], args["effective_genome_size"], args["gaps_allowed"])
-
-  chip_df = give_bins_pvalues(chip_df, island_enriched_threshold, average_window_readcount)
-
-
-  df = join(chip_df, input_df, on=[:Chromosome, :Bin], kind=:left)
-  rename!(df, [:Count_1 => :InputCount])
-  missing_input = ismissing.(df[:InputCount])
-  df[missing_input, :InputCount] = 0
+    df = join(chip_df, input_df, on=[:Chromosome, :Bin], kind=:left)
+    rename!(df, [:Count_1 => :InputCount])
+    missing_input = ismissing.(df[:InputCount])
+    df[missing_input, :InputCount] = 0
 
 
-  rename!(df, [:Bin => :Start])
-  df[:End] = df[:Start] .+ args["bin_size"] .- 1
-  df[:Score] = -log.(df[:Score])
+    rename!(df, [:Bin => :Start])
+    df[:End] = df[:Start] .+ args["bin_size"] .- 1
+    df[:Score] = -log.(df[:Score])
 
-  result = by(df, [:Chromosome], x -> merge_nearby_bins(x, args["gaps_allowed"], args["bin_size"], score_threshold))
+    result = by(df, [:Chromosome], x -> merge_nearby_bins(x, args["gaps_allowed"], args["bin_size"], score_threshold))
 
-  result = result[[:Chromosome, :Start, :End, :Count, :InputCount, :Score]]
+    result = result[[:Chromosome, :Start, :End, :Count, :InputCount, :Score]]
 
-  fdr_df = give_islands_fdr_score(result, total_chip_count, total_input_count, args["effective_genome_fraction"])
+    fdr_df = give_islands_fdr_score(result, total_chip_count, total_input_count, args["effective_genome_fraction"])
 
-  CSV.write(args["outfile"], fdr_df, delim='\t')
+    CSV.write(args["outfile"], fdr_df, delim='\t')
 
 end
 
@@ -248,20 +292,20 @@ function bam_to_df(f, nrows)
 end
 
 
-function bed_to_dict(f)
-    genome = Dict{Tuple{String, Char}, Array{Int64, 1}}
+function add_reads_to_dict(f)
+
+    genome = Dict{Tuple{String, String}, Array{Int64, 1}}()
 
     open(f) do f
         for l in eachline(f)
-            c, s, e, _, _, str = split(l)
-            if str == '+'
-                five_end = parse(Int64, s)
+            chromosome, left, right, _, _, strand = split(l)
+            if strand == "+"
+                five_end = parse(Int64, left)
             else
-                five_end = parse(Int64, e)
+                five_end = parse(Int64, right)
             end
 
-            println(c, s, e, str)
-            push!(genome[String(c), String(str)], five_end)
+            push!(get!(genome, (chromosome, strand), Int64[]), five_end)
         end
     end
 
