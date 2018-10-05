@@ -248,6 +248,27 @@ function bam_to_df(f, nrows)
 end
 
 
+function bed_to_dict(f)
+    genome = Dict{Tuple{String, Char}, Array{Int64, 1}}
+
+    open(f) do f
+        for l in eachline(f)
+            c, s, e, _, _, str = split(l)
+            if str == '+'
+                five_end = parse(Int64, s)
+            else
+                five_end = parse(Int64, e)
+            end
+
+            println(c, s, e, str)
+            push!(genome[String(c), String(str)], five_end)
+        end
+    end
+
+    genome
+end
+
+
 function file_to_df(f, nrows=nothing)
     if endswith(f, ".bam")
         bam_to_df(f, nrows)
